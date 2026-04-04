@@ -1,0 +1,32 @@
+{
+  "name": "open-source-vulnerabilities-analysis",
+  "version": "1.0.0",
+  "description": "Course project for analyzing open-source package vulnerabilities and maintenance patterns",
+  "type": "module",
+  "main": "scripts/js/extract_osv_npm.js",
+  "scripts": {
+    "extract-osv": "node scripts/js/extract_osv_npm.js",
+    "build-osv-summary": "node scripts/js/build_osv_package_summary.js",
+    "fetch-librariesio-projects": "node scripts/js/fetch_librariesio_projects.js",
+    "fetch-librariesio-deps": "node scripts/js/fetch_librariesio_dependencies.js",
+    "build-negative-sample": "node scripts/js/build_negative_sample.js",
+    "build-risk-summary": "node scripts/js/build_extracted_package_risk_summary.js"
+  },
+  "keywords": [
+    "npm",
+    "vulnerabilities",
+    "osv",
+    "libraries.io",
+    "security",
+    "analysis"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "papaparse": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

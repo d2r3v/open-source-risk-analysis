@@ -1,0 +1,16 @@
+# Python Dependencies for Open-Source Package Vulnerabilities Analysis
+# 
+# Install with: pip install -r requirements.txt
+
+# Data manipulation and analysis
+pandas>=1.3.0
+
+# Scientific computing and machine learning
+scikit-learn>=1.0.0
+
+# Visualization
+matplotlib>=3.4.0
+
+# Optional: jupyter notebooks (for interactive analysis)
+# jupyter>=1.0.0
+# ipython>=7.0.0
