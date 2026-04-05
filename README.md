@@ -78,6 +78,7 @@ Get-Content sql/load_data.sql | docker exec -i osv-postgres psql -U postgres -d 
 - **Popularity Correlation**: High-severity packages have **~2x more stars** on average than non-vulnerable ones.
 - **Scrutiny Bias**: Popular packages show higher disclosure rates, suggesting that increased usage leads to more intensive security audits.
 - **Maintenance Paradox**: Recently maintained packages still exhibit high vulnerability counts, indicating that active development does not always outpace security debt.
+- **Quantified Risk Ranking**: Using a weighted composite risk score, **Electron** and **Ghost** were identified as the highest-risk packages, combining high vulnerability density with massive user exposure.
 
 ## Key Outputs
 - **PostgreSQL Database**: Structured vulnerability and maintenance metadata for complex analytical querying.
