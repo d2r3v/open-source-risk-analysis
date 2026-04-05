@@ -54,6 +54,9 @@ node scripts/js/extract_osv_npm.js
 node scripts/js/build_osv_package_summary.js
 node scripts/js/build_extracted_package_risk_summary.js
 
+# Compute Risk Scores
+python scripts/python/compute_risk_scores.py
+
 # Generate Visualizations
 python scripts/python/generate_visualizations.py
 ```
@@ -78,7 +81,7 @@ Get-Content sql/load_data.sql | docker exec -i osv-postgres psql -U postgres -d 
 
 ## Key Outputs
 - **PostgreSQL Database**: Structured vulnerability and maintenance metadata for complex analytical querying.
-- **Consolidated Risk Dataset**: `extracted_package_risk_summary.csv` containing joined package metrics.
+- **Risk Scored Dataset**: `extracted_package_risk_scored.csv` containing weighted risk indices.
 - **Analytical Visualizations**: Reproducible statistical charts in `reports/figures/`.
 
 ## Limitations
