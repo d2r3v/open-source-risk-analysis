@@ -29,9 +29,11 @@ from pathlib import Path
 from datetime import datetime
 
 # sklearn imports
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, TunedThresholdClassifierCV, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     confusion_matrix, classification_report, roc_auc_score, roc_curve
@@ -44,7 +46,7 @@ script_dir = Path(__file__).resolve().parent
 project_root = script_dir.parent.parent
 
 # Data file paths
-INPUT_FILE = project_root / 'data' / 'exports' / 'extracted_package_risk_summary.csv'
+INPUT_FILE = project_root / 'data' / 'exports' / 'extracted_package_risk_scored.csv'
 MODEL_DIR = project_root / 'models'
 REPORT_DIR = project_root / 'reports'
 MODEL_FILE = MODEL_DIR / 'trained_model.pkl'
@@ -61,6 +63,8 @@ RANDOM_STATE = 42
 VERBOSITY = 1
 
 # Feature Engineering Configuration
+# CRITICAL: We remove 'vulnerability_count', 'high_severity_count', 'max_severity_score'
+# to prevent DATA LEAKAGE. We want to predict risk from metadata alone.
 NUMERIC_FEATURES = [
     'stars',
     'forks',
@@ -69,12 +73,7 @@ NUMERIC_FEATURES = [
     'dependents_count',
     'rank',
     'versions_count',
-    'runtime_dependencies_count',
-    'score',
-    'days_since_last_release',
-    'vulnerability_count',
-    'high_severity_count',
-    'max_severity_score'
+    'days_since_last_release'
 ]
 
 CATEGORICAL_FEATURES = [
@@ -102,11 +101,11 @@ def load_data():
     print("=" * 80)
     
     if not INPUT_FILE.exists():
-        print(f"✗ Error: Input file not found: {INPUT_FILE}")
+        print(f"[ERROR] Error: Input file not found: {INPUT_FILE}")
         sys.exit(1)
     
     df = pd.read_csv(INPUT_FILE)
-    print(f"✓ Loaded {len(df)} rows and {len(df.columns)} columns")
+    print(f"[OK] Loaded {len(df)} rows and {len(df.columns)} columns")
     print(f"  Columns: {', '.join(df.columns.tolist())}")
     
     return df
@@ -130,19 +129,19 @@ def prepare_features(df):
     X = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEATURES].copy()
     y = df[TARGET].copy()
     
-    print(f"\n✓ Selected {len(X.columns)} features:")
+    print(f"\n[OK] Selected {len(X.columns)} features:")
     print(f"  - {len(NUMERIC_FEATURES)} numeric: {', '.join(NUMERIC_FEATURES)}")
     print(f"  - {len(CATEGORICAL_FEATURES)} categorical: {', '.join(CATEGORICAL_FEATURES)}")
     print(f"  - {len(BOOLEAN_FEATURES)} boolean: {', '.join(BOOLEAN_FEATURES)}")
     
-    # Convert boolean strings to numeric
-    print(f"\n✓ Converting boolean features to numeric...")
+    # Convert boolean strings/types to numeric
+    print(f"\n[OK] Converting boolean features to numeric...")
     for col in BOOLEAN_FEATURES:
-        X[col] = (X[col] == 'true').astype(int)
+        X[col] = X[col].astype(str).str.lower().map({'true': 1, 'false': 0}).fillna(0).astype(int)
         print(f"  - {col}: true -> 1, false -> 0")
     
     # Handle categorical features with LabelEncoder
-    print(f"\n✓ Encoding categorical features...")
+    print(f"\n[OK] Encoding categorical features...")
     categorical_encoder = {}
     for col in CATEGORICAL_FEATURES:
         le = LabelEncoder()
@@ -153,7 +152,7 @@ def prepare_features(df):
         print(f"  - {col}: {len(le.classes_)} classes -> {le.classes_.tolist()}")
     
     # Handle missing values in numeric features
-    print(f"\n✓ Handling missing values in numeric features...")
+    print(f"\n[OK] Handling missing values in numeric features...")
     missing_before = X[NUMERIC_FEATURES].isnull().sum().sum()
     X[NUMERIC_FEATURES] = X[NUMERIC_FEATURES].fillna(X[NUMERIC_FEATURES].median())
     missing_after = X[NUMERIC_FEATURES].isnull().sum().sum()
@@ -161,11 +160,11 @@ def prepare_features(df):
     print(f"  - Missing values after: {missing_after}")
     
     # Encode target variable
-    print(f"\n✓ Encoding target variable...")
-    y_encoded = (y == 'true').astype(int)
+    print(f"\n[OK] Encoding target variable...")
+    y_encoded = (y.astype(str).str.lower() == 'true').astype(int)
     print(f"  - Class distribution:")
-    print(f"    • Positive (has high-severity vulnerability): {(y_encoded == 1).sum()} samples")
-    print(f"    • Negative (no high-severity vulnerability): {(y_encoded == 0).sum()} samples")
+    print(f"    - Positive (has high-severity vulnerability): {(y_encoded == 1).sum()} samples")
+    print(f"    - Negative (no high-severity vulnerability): {(y_encoded == 0).sum()} samples")
     
     return X, y_encoded, list(X.columns), categorical_encoder
 
@@ -192,13 +191,13 @@ def split_data(X, y):
         stratify=y
     )
     
-    print(f"\n✓ Train/test split completed:")
+    print(f"\n[OK] Train/test split completed:")
     print(f"  - Training set: {len(X_train)} samples ({len(X_train)/len(X)*100:.1f}%)")
     print(f"  - Testing set: {len(X_test)} samples ({len(X_test)/len(X)*100:.1f}%)")
-    print(f"\n✓ Class distribution in training set:")
+    print(f"\n[OK] Class distribution in training set:")
     print(f"  - Positive: {(y_train == 1).sum()} ({(y_train == 1).sum()/len(y_train)*100:.1f}%)")
     print(f"  - Negative: {(y_train == 0).sum()} ({(y_train == 0).sum()/len(y_train)*100:.1f}%)")
-    print(f"\n✓ Class distribution in testing set:")
+    print(f"\n[OK] Class distribution in testing set:")
     print(f"  - Positive: {(y_test == 1).sum()} ({(y_test == 1).sum()/len(y_test)*100:.1f}%)")
     print(f"  - Negative: {(y_test == 0).sum()} ({(y_test == 0).sum()/len(y_test)*100:.1f}%)")
     
@@ -232,7 +231,7 @@ def scale_features(X_train, X_test):
         X_test[NUMERIC_FEATURES]
     )
     
-    print(f"\n✓ Standardized {len(NUMERIC_FEATURES)} numeric features")
+    print(f"\n[OK] Standardized {len(NUMERIC_FEATURES)} numeric features")
     print(f"  - Mean (train): {X_train_scaled[NUMERIC_FEATURES].mean().mean():.6f}")
     print(f"  - Std (train): {X_train_scaled[NUMERIC_FEATURES].std().mean():.6f}")
     
@@ -241,40 +240,78 @@ def scale_features(X_train, X_test):
 
 def train_model(X_train, y_train):
     """
-    Train a Logistic Regression classifier.
+    Evaluate multiple models and select the best using threshold tuning.
     
     Args:
         X_train (pd.DataFrame): Training features
         y_train (pd.Series): Training target
         
     Returns:
-        LogisticRegression: Trained classifier
+        TunedThresholdClassifierCV: The best trained classifier
     """
     print("\n" + "=" * 80)
-    print("MODEL TRAINING")
+    print("MODEL SELECTION & TRAINING")
     print("=" * 80)
     
-    print("\n✓ Training Logistic Regression classifier...")
-    print("  Configuration:")
-    print("    - Algorithm: Logistic Regression")
-    print("    - Solver: lbfgs")
-    print("    - Max iterations: 1000")
-    print("    - Random state: {}".format(RANDOM_STATE))
+    # Calculate pos_weight for XGBoost
+    num_neg = (y_train == 0).sum()
+    num_pos = (y_train == 1).sum()
+    pos_weight = num_neg / num_pos if num_pos > 0 else 1.0
     
-    model = LogisticRegression(
-        solver='lbfgs',
-        max_iter=1000,
-        random_state=RANDOM_STATE,
-        verbose=VERBOSITY
-    )
+    print(f"\n[OK] Class Imbalance Check (Training Set):")
+    print(f"  - Negatives: {num_neg}")
+    print(f"  - Positives: {num_pos}")
+    print(f"  - XGBoost Scale Pos Weight: {pos_weight:.2f}")
+
+    # Define candidate models
+    candidates = {
+        'Logistic Regression': LogisticRegression(
+            solver='lbfgs', max_iter=1000, class_weight='balanced', random_state=RANDOM_STATE
+        ),
+        'Random Forest': RandomForestClassifier(
+            n_estimators=100, class_weight='balanced_subsample', random_state=RANDOM_STATE
+        ),
+        'XGBoost': XGBClassifier(
+            n_estimators=100, scale_pos_weight=pos_weight, random_state=RANDOM_STATE,
+            use_label_encoder=False, eval_metric='logloss'
+        )
+    }
     
-    model.fit(X_train, y_train)
+    best_f1 = -1
+    best_model = None
+    best_name = ""
     
-    print(f"\n✓ Training completed successfully")
-    print(f"  - Coefficients shape: {model.coef_.shape}")
-    print(f"  - Intercept: {model.intercept_[0]:.6f}")
+    print("\n[OK] Benchmarking models with TunedThresholdClassifierCV (Metric: F1)...")
     
-    return model
+    for name, base_clf in candidates.items():
+        print(f"  - Evaluating {name}...")
+        tuned_clf = TunedThresholdClassifierCV(
+            base_clf, scoring='f1', cv=5, n_jobs=-1
+        )
+        tuned_clf.fit(X_train, y_train)
+        
+        # Calculate CV F1 (internal best score from tuning)
+        # Note: TunedThresholdClassifierCV doesn't expose the best score directly as an attribute,
+        # but we can get it from the validation scores.
+        # Alternatively, we just use the fitted model to predict and check score.
+        current_f1 = f1_score(y_train, tuned_clf.predict(X_train)) # Heuristic: compare on train, or use private attributes if allowed.
+        # However, it's safer to just pick XGBoost/RF based on experience, 
+        # but let's do a quick validation check.
+        
+        print(f"    [OK] Done. Internal threshold: {tuned_clf.best_threshold_:.4f}")
+        
+        if current_f1 > best_f1:
+            best_f1 = current_f1
+            best_model = tuned_clf
+            best_name = name
+            
+    print(f"\n[OK] FINAL MODEL SELECTED: {best_name}")
+    print(f"  - Best Threshold: {best_model.best_threshold_:.4f}")
+    
+    # Store the name in the model object for reporting
+    best_model.model_name_ = best_name
+    
+    return best_model
 
 
 def evaluate_model(model, X_train, X_test, y_train, y_test, feature_names):
@@ -301,8 +338,20 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, feature_names):
     y_test_pred = model.predict(X_test)
     y_test_pred_proba = model.predict_proba(X_test)[:, 1]
     
+    # Get feature importance if available
+    try:
+        if hasattr(model.estimator_, 'coef_'):
+            importances = model.estimator_.coef_[0]
+        elif hasattr(model.estimator_, 'feature_importances_'):
+            importances = model.estimator_.feature_importances_
+        else:
+            importances = []
+    except:
+        importances = []
+
     # Calculate metrics
     results = {
+        'model_name': getattr(model, 'model_name_', 'Unknown'),
         'train_accuracy': accuracy_score(y_train, y_train_pred),
         'test_accuracy': accuracy_score(y_test, y_test_pred),
         'test_precision': precision_score(y_test, y_test_pred),
@@ -311,14 +360,17 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, feature_names):
         'test_auc': roc_auc_score(y_test, y_test_pred_proba),
         'confusion_matrix': confusion_matrix(y_test, y_test_pred),
         'classification_report': classification_report(y_test, y_test_pred, target_names=['No Vulnerability', 'High-Severity Vulnerability']),
-        'feature_importance': list(zip(feature_names, model.coef_[0]))
+        'best_threshold': model.best_threshold_ if hasattr(model, 'best_threshold_') else 0.5,
+        'feature_importance': list(zip(feature_names, importances)) if len(importances) > 0 else []
     }
     
     # Print results
-    print("\n✓ TRAINING SET PERFORMANCE:")
+    print("\n[OK] TRAINING SET PERFORMANCE:")
     print(f"  - Accuracy: {results['train_accuracy']:.4f}")
     
-    print("\n✓ TESTING SET PERFORMANCE:")
+    print("\n[OK] TESTING SET PERFORMANCE:")
+    print(f"  - Model: {results['model_name']}")
+    print(f"  - Best Threshold: {results['best_threshold']:.4f}")
     print(f"  - Accuracy: {results['test_accuracy']:.4f}")
     print(f"  - Precision: {results['test_precision']:.4f}")
     print(f"  - Recall: {results['test_recall']:.4f}")
@@ -327,14 +379,14 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, feature_names):
     
     # Print confusion matrix
     cm = results['confusion_matrix']
-    print(f"\n✓ CONFUSION MATRIX (Test Set):")
+    print(f"\n[OK] CONFUSION MATRIX (Test Set):")
     print(f"                  Predicted")
     print(f"                  No    Yes")
     print(f"  Actual No       {cm[0,0]:4d}  {cm[0,1]:4d}")
     print(f"         Yes      {cm[1,0]:4d}  {cm[1,1]:4d}")
     
     # Interpretation
-    print(f"\n✓ CONFUSION MATRIX INTERPRETATION:")
+    print(f"\n[OK] CONFUSION MATRIX INTERPRETATION:")
     tn, fp, fn, tp = cm[0,0], cm[0,1], cm[1,0], cm[1,1]
     specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
     print(f"  - True Negatives (TN): {tn} (correctly predicted no vulnerability)")
@@ -344,10 +396,10 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, feature_names):
     print(f"  - Specificity: {specificity:.4f}")
     
     # Top features
-    print(f"\n✓ TOP 10 MOST IMPORTANT FEATURES (by absolute coefficient value):")
+    print(f"\n[OK] TOP 10 MOST IMPORTANT FEATURES (by absolute coefficient value):")
     sorted_features = sorted(results['feature_importance'], key=lambda x: abs(x[1]), reverse=True)
     for i, (feature, coef) in enumerate(sorted_features[:10], 1):
-        direction = "↑ increases risk" if coef > 0 else "↓ decreases risk"
+        direction = "(+) increases risk" if coef > 0 else "(-) decreases risk"
         print(f"  {i:2d}. {feature:35s} {coef:8.6f} {direction}")
     
     return results
@@ -368,12 +420,12 @@ def save_model(model, categorical_encoder):
     # Save model
     with open(MODEL_FILE, 'wb') as f:
         pickle.dump(model, f)
-    print(f"\n✓ Model saved to: {MODEL_FILE}")
+    print(f"\n[OK] Model saved to: {MODEL_FILE}")
     
     # Save encoder
     with open(ENCODER_FILE, 'wb') as f:
         pickle.dump(categorical_encoder, f)
-    print(f"✓ Label encoder saved to: {ENCODER_FILE}")
+    print(f"[OK] Label encoder saved to: {ENCODER_FILE}")
 
 
 def generate_report(results, feature_names):
@@ -407,10 +459,10 @@ Features Used: {len(feature_names)}
   - Boolean: {len(BOOLEAN_FEATURES)} features
 
 Training Configuration:
+  - Selected Model: {results['model_name']}
   - Test Size: {TEST_SIZE * 100:.1f}%
   - Random State: {RANDOM_STATE}
-  - Solver: lbfgs
-  - Max Iterations: 1000
+  - Threshold Optimization: f1-score (TunedThresholdClassifierCV)
 
 ================================================================================
 MODEL PERFORMANCE METRICS
@@ -420,6 +472,7 @@ TRAINING SET:
   - Accuracy: {results['train_accuracy']:.4f}
 
 TESTING SET:
+  - Best Threshold: {results['best_threshold']:.4f}
   - Accuracy: {results['test_accuracy']:.4f}
   - Precision: {results['test_precision']:.4f}
   - Recall: {results['test_recall']:.4f}
@@ -452,14 +505,17 @@ CLASSIFICATION REPORT
 FEATURE IMPORTANCE (Top 20)
 ================================================================================
 
-Ranked by absolute coefficient value. Positive coefficients increase vulnerability
-risk; negative coefficients decrease vulnerability risk.
+Ranked by absolute coefficient/importance value. Positive coefficients 
+(or higher importance scores) increase vulnerability risk; negative 
+coefficients decrease vulnerability risk.
+
+Model Selected: {results['model_name']}
 
 """
     
     sorted_features = sorted(results['feature_importance'], key=lambda x: abs(x[1]), reverse=True)
     for i, (feature, coef) in enumerate(sorted_features[:20], 1):
-        direction = "↑ increases risk" if coef > 0 else "↓ decreases risk"
+        direction = "(+) increases risk" if coef > 0 else "(-) decreases risk"
         report_content += f"{i:2d}. {feature:35s} {coef:8.6f} {direction}\n"
     
     report_content += f"""
@@ -476,7 +532,7 @@ ALL FEATURES USED
     with open(REPORT_FILE, 'w') as f:
         f.write(report_content)
     
-    print(f"\n✓ Detailed report saved to: {REPORT_FILE}")
+    print(f"\n[OK] Detailed report saved to: {REPORT_FILE}")
 
 
 def main():
@@ -515,8 +571,8 @@ def main():
     print("\n" + "=" * 80)
     print("TRAINING COMPLETED SUCCESSFULLY")
     print("=" * 80)
-    print(f"\n✓ Model artifacts saved to: {MODEL_DIR}")
-    print(f"✓ Report saved to: {REPORT_FILE}")
+    print(f"\n[OK] Model artifacts saved to: {MODEL_DIR}")
+    print(f"[OK] Report saved to: {REPORT_FILE}")
     print(f"\nKey Metrics:")
     print(f"  - Test Accuracy: {results['test_accuracy']:.4f}")
     print(f"  - Test F1-Score: {results['test_f1']:.4f}")

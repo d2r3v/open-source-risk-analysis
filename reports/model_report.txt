@@ -1,0 +1,106 @@
+
+================================================================================
+BINARY CLASSIFICATION MODEL REPORT
+High-Severity Vulnerability Prediction for npm Packages
+================================================================================
+
+Generated: 2026-04-04 23:49:06
+
+================================================================================
+MODEL CONFIGURATION
+================================================================================
+
+Algorithm: Logistic Regression
+Features Used: 11
+  - Numeric: 8 features
+  - Categorical: 1 features
+  - Boolean: 2 features
+
+Training Configuration:
+  - Selected Model: Random Forest
+  - Test Size: 20.0%
+  - Random State: 42
+  - Threshold Optimization: f1-score (TunedThresholdClassifierCV)
+
+================================================================================
+MODEL PERFORMANCE METRICS
+================================================================================
+
+TRAINING SET:
+  - Accuracy: 0.9907
+
+TESTING SET:
+  - Best Threshold: 0.2483
+  - Accuracy: 0.8696
+  - Precision: 0.3333
+  - Recall: 0.3404
+  - F1-Score: 0.3368
+  - AUC-ROC: 0.8098
+
+================================================================================
+CONFUSION MATRIX (Test Set)
+================================================================================
+
+                  Predicted
+                  No    Yes
+  Actual No        404    32
+         Yes        31    16
+
+TN (True Negatives):   404 - Correctly predicted no vulnerability
+FP (False Positives):   32 - Incorrectly predicted vulnerability
+FN (False Negatives):   31 - Missed high-severity vulnerabilities
+TP (True Positives):    16 - Correctly predicted vulnerability
+
+Specificity: 0.9266
+
+================================================================================
+CLASSIFICATION REPORT
+================================================================================
+
+                             precision    recall  f1-score   support
+
+           No Vulnerability       0.93      0.93      0.93       436
+High-Severity Vulnerability       0.33      0.34      0.34        47
+
+                   accuracy                           0.87       483
+                  macro avg       0.63      0.63      0.63       483
+               weighted avg       0.87      0.87      0.87       483
+
+
+================================================================================
+FEATURE IMPORTANCE (Top 20)
+================================================================================
+
+Ranked by absolute coefficient/importance value. Positive coefficients 
+(or higher importance scores) increase vulnerability risk; negative 
+coefficients decrease vulnerability risk.
+
+Model Selected: Random Forest
+
+ 1. dependent_repos_count               0.175189 (+) increases risk
+ 2. days_since_last_release             0.141037 (+) increases risk
+ 3. dependents_count                    0.139290 (+) increases risk
+ 4. forks                               0.129646 (+) increases risk
+ 5. versions_count                      0.108894 (+) increases risk
+ 6. contributions_count                 0.108435 (+) increases risk
+ 7. rank                                0.093100 (+) increases risk
+ 8. stars                               0.088651 (+) increases risk
+ 9. has_repository                      0.007420 (+) increases risk
+10. repository_status                   0.005416 (+) increases risk
+11. is_unmaintained                     0.002921 (+) increases risk
+
+================================================================================
+ALL FEATURES USED
+================================================================================
+
+  1. dependent_repos_count               0.175189
+  2. days_since_last_release             0.141037
+  3. dependents_count                    0.139290
+  4. forks                               0.129646
+  5. versions_count                      0.108894
+  6. contributions_count                 0.108435
+  7. rank                                0.093100
+  8. stars                               0.088651
+  9. has_repository                      0.007420
+ 10. repository_status                   0.005416
+ 11. is_unmaintained                     0.002921

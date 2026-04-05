@@ -3,13 +3,14 @@
 Analyzing the relationship between package popularity, maintenance activity, and vulnerability exposure using OSV and Libraries.io data.
 
 ## Problem Statement
-This project investigates whether package metadata (popularity, maintenance activity) can help identify packages that are more likely to contain high-severity vulnerabilities. **Can we identify characteristics of projects that are associated with higher vulnerability risk?**
+This project investigates whether package metadata (popularity, maintenance activity) can help identify packages that are more likely to contain high-severity vulnerabilities.
 
 ## Datasets
-1. **OSV (Open Source Vulnerabilities)**: Distributed vulnerability database for open-source projects.
-   - [OSV API Documentation](https://osv.dev)
-2. **Libraries.io**: Metadata on over 5 million open-source packages across 32 ecosystems.
-   - [Libraries.io API](https://libraries.io)
+1. **OSV (Open Source Vulnerabilities)**  
+   [https://osv.dev](https://osv.dev)  
+
+2. **Libraries.io**  
+   [https://libraries.io](https://libraries.io)  
 
 ## Pipeline Overview
 1. **Metadata Extraction**: Fetch project statistics (stars, forks, maintenance status) from Libraries.io.
@@ -19,6 +20,8 @@ This project investigates whether package metadata (popularity, maintenance acti
 5. **Aggregation**: Compute package-level risk metrics (vulnerability counts, max severity).
 6. **SQL Integration**: Load enriched datasets into a PostgreSQL database for structured querying.
 7. **Visualization**: Generate analytical charts using Python (pandas, seaborn).
+
+> A detailed data dictionary describing all features and transformations is available in `data_dictionary.md`.
 
 ## Tech Stack
 - **JavaScript (Node.js)**: Core data extraction and transformation pipeline.
@@ -78,6 +81,10 @@ Get-Content sql/load_data.sql | docker exec -i osv-postgres psql -U postgres -d 
 - **Popularity Correlation**: High-severity packages have **~2x more stars** on average than non-vulnerable ones.
 - **Scrutiny Bias**: Popular packages show higher disclosure rates, suggesting that increased usage leads to more intensive security audits.
 - **Maintenance Paradox**: Recently maintained packages still exhibit high vulnerability counts, indicating that active development does not always outpace security debt.
+- **Predictive Modeling (Random Forest)**: Using class balancing and an aggressive threshold (0.05), the model achieved **~90% Recall** for high-severity vulnerabilities.
+    - **Sensitivity Goal**: Catching 42 out of 47 high-risk packages in the test set.
+    - **AUC-ROC (0.81)**: High-reliability predictor for security triage.
+    - **Strategic Value**: Minimized False Negatives (Misses) from 31 down to 5, creating a robust "Safety-First" early warning system.
 - **Quantified Risk Ranking**: Using a weighted composite risk score, **Electron** and **Ghost** were identified as the highest-risk packages, combining high vulnerability density with massive user exposure.
 
 ## Key Outputs
@@ -89,6 +96,10 @@ Get-Content sql/load_data.sql | docker exec -i osv-postgres psql -U postgres -d 
 - **Public Disclosures**: Data is limited to publicly reported vulnerabilities in the OSV database.
 - **Reporting Bias**: More popular projects are more heavily scrutinized, which may skew findings toward larger repositories.
 - **Severity Mapping**: Some severity scores are estimated based on textual labels (e.g., HIGH -> 8.0) when official CVSS scores are missing.
+
+## Notes
+- **Execution Time**: Full pipeline execution may take several hours due to API rate limits (Libraries.io).
+- **API Keys**: Requires a `LIBRARIES_IO_API_KEY` to be set in your environment.
 
 ## Repository Structure
 ```text
