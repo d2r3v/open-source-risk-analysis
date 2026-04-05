@@ -25,7 +25,8 @@ const CSV_HEADERS = [
   'modified',
   'severity_type',
   'severity_score',
-  'is_high_severity'
+  'is_high_severity',
+  'is_malware'
 ];
 
 /**
@@ -121,7 +122,8 @@ function extractVulnerabilitiesFromRecord(osvData) {
       modified: modified,
       severity_type: severityData.type,
       severity_score: score !== null ? score.toFixed(1) : '',
-      is_high_severity: high ? 'true' : 'false'
+      is_high_severity: high ? 'true' : 'false',
+      is_malware: severityData.type === 'MALWARE' ? 'true' : 'false'
     });
   });
 
