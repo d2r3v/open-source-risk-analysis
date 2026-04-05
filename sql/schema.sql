@@ -33,7 +33,9 @@ CREATE TABLE raw_osv_vulnerabilities (
 CREATE TABLE raw_librariesio_projects (
     id SERIAL PRIMARY KEY,
     package_name VARCHAR(255) NOT NULL,
-    ecosystem VARCHAR(50) NOT NULL,
+    platform VARCHAR(50),
+    description TEXT,
+    language VARCHAR(100),
     stars INTEGER DEFAULT 0,
     forks INTEGER DEFAULT 0,
     contributions_count INTEGER DEFAULT 0,
@@ -41,9 +43,12 @@ CREATE TABLE raw_librariesio_projects (
     dependents_count INTEGER DEFAULT 0,
     rank INTEGER DEFAULT 0,
     repository_status VARCHAR(50),
+    repository_url TEXT,
+    licenses VARCHAR(255),
+    normalized_licenses VARCHAR(255),
+    latest_release_number VARCHAR(100),
     latest_release_published_at TIMESTAMP,
     versions_count INTEGER DEFAULT 0,
-    repository_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -3,16 +3,13 @@
 -- Data Loading Script (Optimized for Enriched CSVs)
 -- ============================================================================
 
--- Note: Ensure paths are correct for your local environment.
--- The following commands assume you are running from the project root.
-
 -- 1. Load Raw OSV Vulnerabilities
 TRUNCATE raw_osv_vulnerabilities;
 \COPY raw_osv_vulnerabilities (osv_id, package_name, ecosystem, published, modified, severity_type, severity_score, is_high_severity, is_malware) FROM 'data/cleaned/osv_npm_flat.csv' WITH (FORMAT csv, HEADER true);
 
--- 2. Load Raw Libraries.io Projects
+-- 2. Load Raw Libraries.io Projects (Matches CSV Headers)
 TRUNCATE raw_librariesio_projects;
-\COPY raw_librariesio_projects (package_name, ecosystem, stars, forks, contributions_count, dependent_repos_count, dependents_count, rank, repository_status, latest_release_published_at, versions_count, repository_url) FROM 'data/cleaned/librariesio_projects.csv' WITH (FORMAT csv, HEADER true);
+\COPY raw_librariesio_projects (package_name, platform, description, language, stars, forks, contributions_count, dependent_repos_count, dependents_count, rank, repository_status, repository_url, licenses, normalized_licenses, latest_release_number, latest_release_published_at, versions_count) FROM 'data/cleaned/librariesio_projects.csv' WITH (FORMAT csv, HEADER true);
 
 -- 3. Load Package Vulnerability Summary
 TRUNCATE package_vulnerability_summary;
@@ -24,6 +21,8 @@ TRUNCATE extracted_package_risk_summary;
 
 -- Verification: Print row counts
 SELECT 'raw_osv_vulnerabilities' as table_name, COUNT(*) FROM raw_osv_vulnerabilities
+UNION ALL
+SELECT 'raw_librariesio_projects', COUNT(*) FROM raw_librariesio_projects
 UNION ALL
 SELECT 'package_vulnerability_summary', COUNT(*) FROM package_vulnerability_summary
 UNION ALL
